@@ -75,7 +75,10 @@ public:
 
         bool result = UpdateTimer(clock::now());
         // measure again so runtime of UpdateTimer is not included
-        m_start_time = clock::now();
+        //
+        // jamesob: mark start time as being a second in the past so that we noticably
+        // slow everything down.
+        m_start_time = clock::now() - std::chrono::seconds(1);
         return result;
     }
 };
