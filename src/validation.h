@@ -816,6 +816,7 @@ private:
     bool m_snapshot_validated{false};
 
     // For access to m_active_chainstate.
+    friend CChainState& ChainstateActive();
     friend CChain& ChainActive();
 
 public:
@@ -864,6 +865,8 @@ public:
     void Reset();
 };
 
+extern ChainstateManager g_chainman;
+
 /** @returns the most-work valid chainstate. */
 CChainState& ChainstateActive();
 
@@ -872,11 +875,6 @@ CChain& ChainActive();
 
 /** @returns the global block index map. */
 BlockMap& BlockIndex();
-
-// Most often ::ChainstateActive() should be used instead of this, but some code
-// may not be able to assume that this has been initialized yet and so must use it
-// directly, e.g. init.cpp.
-extern std::unique_ptr<CChainState> g_chainstate;
 
 /** Global variable that points to the active block tree (protected by cs_main) */
 extern std::unique_ptr<CBlockTreeDB> pblocktree;

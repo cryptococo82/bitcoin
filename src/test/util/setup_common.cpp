@@ -108,7 +108,7 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
     GetMainSignals().RegisterBackgroundSignalScheduler(scheduler);
 
     pblocktree.reset(new CBlockTreeDB(1 << 20, true));
-    g_chainstate = MakeUnique<CChainState>();
+    g_chainman.InitializeChainstate(/*activate*/ true);
     ::ChainstateActive().InitCoinsDB(
         /* cache_size_bytes */ 1 << 23, /* in_memory */ true, /* should_wipe */ false);
     assert(!::ChainstateActive().CanFlushToDisk());
@@ -147,7 +147,7 @@ TestingSetup::~TestingSetup()
     m_node.banman.reset();
     m_node.mempool = nullptr;
     UnloadBlockIndex();
-    g_chainstate.reset();
+    g_chainman.Reset();
     pblocktree.reset();
 }
 
