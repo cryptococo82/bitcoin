@@ -522,7 +522,10 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
         // serialize data
         // use exact same output as mentioned in Bip64
         CDataStream ssGetUTXOResponse(SER_NETWORK, PROTOCOL_VERSION);
-        ssGetUTXOResponse << ::ChainActive().Height() << ::ChainActive().Tip()->GetBlockHash() << bitmap << outs;
+        {
+            LOCK(::cs_main);
+            ssGetUTXOResponse << ::ChainActive().Height() << ::ChainActive().Tip()->GetBlockHash() << bitmap << outs;
+        }
         std::string ssGetUTXOResponseString = ssGetUTXOResponse.str();
 
         req->WriteHeader("Content-Type", "application/octet-stream");
@@ -532,7 +535,10 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
 
     case RetFormat::HEX: {
         CDataStream ssGetUTXOResponse(SER_NETWORK, PROTOCOL_VERSION);
-        ssGetUTXOResponse << ::ChainActive().Height() << ::ChainActive().Tip()->GetBlockHash() << bitmap << outs;
+        {
+            LOCK(::cs_main);
+            ssGetUTXOResponse << ::ChainActive().Height() << ::ChainActive().Tip()->GetBlockHash() << bitmap << outs;
+        }
         std::string strHex = HexStr(ssGetUTXOResponse.begin(), ssGetUTXOResponse.end()) + "\n";
 
         req->WriteHeader("Content-Type", "text/plain");
@@ -543,10 +549,13 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
     case RetFormat::JSON: {
         UniValue objGetUTXOResponse(UniValue::VOBJ);
 
-        // pack in some essentials
-        // use more or less the same output as mentioned in Bip64
-        objGetUTXOResponse.pushKV("chainHeight", ::ChainActive().Height());
-        objGetUTXOResponse.pushKV("chaintipHash", ::ChainActive().Tip()->GetBlockHash().GetHex());
+        {
+            LOCK(::cs_main);
+            // pack in some essentials
+            // use more or less the same output as mentioned in Bip64
+            objGetUTXOResponse.pushKV("chainHeight", ::ChainActive().Height());
+            objGetUTXOResponse.pushKV("chaintipHash", ::ChainActive().Tip()->GetBlockHash().GetHex());
+        }
         objGetUTXOResponse.pushKV("bitmap", bitmapStringRepresentation);
 
         UniValue utxos(UniValue::VARR);

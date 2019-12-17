@@ -2884,7 +2884,9 @@ bool CChainState::ActivateBestChain(BlockValidationState &state, const CChainPar
 }
 
 bool ActivateBestChain(BlockValidationState &state, const CChainParams& chainparams, std::shared_ptr<const CBlock> pblock) {
-    return ::ChainstateActive().ActivateBestChain(state, chainparams, std::move(pblock));
+    CChainState* active;
+    WITH_LOCK(::cs_main, active = &::ChainstateActive());
+    return active->ActivateBestChain(state, chainparams, std::move(pblock));
 }
 
 bool CChainState::PreciousBlock(BlockValidationState& state, const CChainParams& params, CBlockIndex *pindex)
@@ -2916,7 +2918,9 @@ bool CChainState::PreciousBlock(BlockValidationState& state, const CChainParams&
     return ActivateBestChain(state, params, std::shared_ptr<const CBlock>());
 }
 bool PreciousBlock(BlockValidationState& state, const CChainParams& params, CBlockIndex *pindex) {
-    return ::ChainstateActive().PreciousBlock(state, params, pindex);
+    CChainState* active;
+    WITH_LOCK(::cs_main, active = &::ChainstateActive());
+    return active->PreciousBlock(state, params, pindex);
 }
 
 bool CChainState::InvalidateBlock(BlockValidationState& state, const CChainParams& chainparams, CBlockIndex *pindex)
@@ -3056,7 +3060,9 @@ bool CChainState::InvalidateBlock(BlockValidationState& state, const CChainParam
 }
 
 bool InvalidateBlock(BlockValidationState& state, const CChainParams& chainparams, CBlockIndex *pindex) {
-    return ::ChainstateActive().InvalidateBlock(state, chainparams, pindex);
+    CChainState* active;
+    WITH_LOCK(::cs_main, active = &::ChainstateActive());
+    return active->InvalidateBlock(state, chainparams, pindex);
 }
 
 void CChainState::ResetBlockFailureFlags(CBlockIndex *pindex) {
@@ -3649,6 +3655,7 @@ bool ProcessNewBlockHeaders(const std::vector<CBlockHeader>& headers, BlockValid
         }
     }
     if (NotifyHeaderTip()) {
+        LOCK(::cs_main);
         if (::ChainstateActive().IsInitialBlockDownload() && ppindex && *ppindex) {
             LogPrintf("Synchronizing blockheaders, height: %d (~%.2f%%)\n", (*ppindex)->nHeight, 100.0/((*ppindex)->nHeight+(GetAdjustedTime() - (*ppindex)->GetBlockTime()) / Params().GetConsensus().nPowTargetSpacing) * (*ppindex)->nHeight);
         }
@@ -3787,7 +3794,10 @@ bool ProcessNewBlock(const CChainParams& chainparams, const std::shared_ptr<cons
     NotifyHeaderTip();
 
     BlockValidationState state; // Only used to report errors, not invalidity - ignore it
-    if (!::ChainstateActive().ActivateBestChain(state, chainparams, pblock))
+    CChainState* active;
+    // Can't call ABC with cs_main held, so get chainstate separately.
+    WITH_LOCK(::cs_main, active = &::ChainstateActive());
+    if (!active->ActivateBestChain(state, chainparams, pblock))
         return error("%s: ActivateBestChain failed (%s)", __func__, FormatStateMessage(state));
 
     return true;
@@ -4588,7 +4598,10 @@ bool CChainState::LoadGenesisBlock(const CChainParams& chainparams)
 
 bool LoadGenesisBlock(const CChainParams& chainparams)
 {
-    return ::ChainstateActive().LoadGenesisBlock(chainparams);
+    CChainState* active;
+    // Can't hold cs_main going into ABC; get chainstate seperately.
+    WITH_LOCK(::cs_main, active = &::ChainstateActive());
+    return active->LoadGenesisBlock(chainparams);
 }
 
 bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, FlatFilePos *dbp)
@@ -4667,7 +4680,12 @@ bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, FlatFi
                 // Activate the genesis block so normal node progress can continue
                 if (hash == chainparams.GetConsensus().hashGenesisBlock) {
                     BlockValidationState state;
-                    if (!ActivateBestChain(state, chainparams)) {
+
+                    // Can't hold cs_main going into ABC, but need cs_main to interact
+                    // with ChainstateActive(), so hackily leg into it.
+                    CChainState* active;
+                    WITH_LOCK(::cs_main, active = &::ChainstateActive());
+                    if (!active->ActivateBestChain(state, chainparams, nullptr)) {
                         break;
                     }
                 }

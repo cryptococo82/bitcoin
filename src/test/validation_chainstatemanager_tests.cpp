@@ -38,7 +38,9 @@ BOOST_AUTO_TEST_CASE(chainstatemanager)
 
     // Create a legacy (IBD) chainstate.
     //
+    ENTER_CRITICAL_SECTION(cs_main);
     CChainState& c1 = manager.InitializeChainstate(true);
+    LEAVE_CRITICAL_SECTION(cs_main);
     chainstates.push_back(&c1);
     c1.InitCoinsDB(
         /* cache_size_bytes */ 1 << 23, /* in_memory */ true, /* should_wipe */ false);
@@ -63,7 +65,9 @@ BOOST_AUTO_TEST_CASE(chainstatemanager)
 
     // Create a snapshot-based chainstate.
     //
+    ENTER_CRITICAL_SECTION(cs_main);
     CChainState& c2 = manager.InitializeChainstate(true, GetRandHash());
+    LEAVE_CRITICAL_SECTION(cs_main);
     chainstates.push_back(&c2);
     c2.InitCoinsDB(
         /* cache_size_bytes */ 1 << 23, /* in_memory */ true, /* should_wipe */ false);

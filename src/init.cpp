@@ -698,11 +698,21 @@ static void ThreadImport(std::vector<fs::path> vImportFiles)
     }
 
     // scan for better chains in the block chain database, that are not yet connected in the active best chain
-    BlockValidationState state;
-    if (!ActivateBestChain(state, chainparams)) {
-        LogPrintf("Failed to connect best block (%s)\n", FormatStateMessage(state));
-        StartShutdown();
-        return;
+
+    // XXX this is kind of a hack to avoid a lock inversion.
+    // We can't hold cs_main during ActivateBestChain even though we're accessing
+    // the g_chainman unique_ptrs since ABC requires us not to be holding cs_main, so retrieve
+    // the relevant pointers before the ABC call.
+    std::vector<CChainState*> chainstates;
+    WITH_LOCK(::cs_main, chainstates = g_chainman.GetAll());
+
+    for (CChainState* chainstate : chainstates) {
+        BlockValidationState state;
+        if (!chainstate->ActivateBestChain(state, chainparams, nullptr)) {
+            LogPrintf("Failed to connect best block (%s)\n", FormatStateMessage(state));
+            StartShutdown();
+            return;
+        }
     }
 
     if (gArgs.GetBoolArg("-stopafterblockimport", DEFAULT_STOPAFTERBLOCKIMPORT)) {
@@ -1578,7 +1588,12 @@ bool AppInitMain(NodeContext& node)
                 break;
             }
 
-            for (CChainState* chainstate : g_chainman.GetAll()) {
+            // Can't hold cs_main while calling RewindBlockIndex, so retrieve the relevant
+            // chainstates beforehand.
+            std::vector<CChainState*> chainstates;
+            WITH_LOCK(::cs_main, chainstates = g_chainman.GetAll());
+
+            for (CChainState* chainstate : chainstates) {
                 if (!fReset) {
                     // Note that RewindBlockIndex MUST run even if we're about to -reindex-chainstate.
                     // It both disconnects blocks based on ::ChainActive(), and drops block data in
@@ -1713,7 +1728,7 @@ bool AppInitMain(NodeContext& node)
         nLocalServices = ServiceFlags(nLocalServices & ~NODE_NETWORK);
         if (!fReindex) {
             uiInterface.InitMessage(_("Pruning blockstore...").translated);
-            ::ChainstateActive().PruneAndFlush();
+            WITH_LOCK(::cs_main, ::ChainstateActive().PruneAndFlush());
         }
     }
 
@@ -1737,7 +1752,9 @@ bool AppInitMain(NodeContext& node)
     // Either install a handler to notify us when genesis activates, or set fHaveGenesis directly.
     // No locking, as this happens before any background thread is started.
     boost::signals2::connection block_notify_genesis_wait_connection;
-    if (::ChainActive().Tip() == nullptr) {
+    bool is_tip_null = true;
+    WITH_LOCK(::cs_main, is_tip_null = ::ChainActive().Tip() == nullptr);
+    if (is_tip_null) {
         block_notify_genesis_wait_connection = uiInterface.NotifyBlockTip_connect(BlockNotifyGenesisWait);
     } else {
         fHaveGenesis = true;

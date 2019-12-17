@@ -270,7 +270,7 @@ void PruneOneBlockFile(const int fileNumber) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 void UnlinkPrunedFiles(const std::set<int>& setFilesToPrune);
 
 /** Prune block files up to a given height */
-void PruneBlockFilesManual(int nManualPruneHeight);
+void PruneBlockFilesManual(int nManualPruneHeight) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
 
 /** (try to) add transaction to memory pool
  * plTxnReplaced will be appended to with all transactions replaced from mempool **/
@@ -873,16 +873,16 @@ public:
     void Reset();
 };
 
-extern ChainstateManager g_chainman;
+extern ChainstateManager g_chainman GUARDED_BY(::cs_main);
 
 /** @returns the most-work valid chainstate. */
-CChainState& ChainstateActive();
+CChainState& ChainstateActive() EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
 
 /** @returns the most-work chain. */
-CChain& ChainActive();
+CChain& ChainActive() EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
 
 /** @returns the global block index map. */
-BlockMap& BlockIndex();
+BlockMap& BlockIndex() EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
 
 /** Global variable that points to the active block tree (protected by cs_main) */
 extern std::unique_ptr<CBlockTreeDB> pblocktree;

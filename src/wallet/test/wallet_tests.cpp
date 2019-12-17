@@ -37,10 +37,10 @@ static void AddKey(CWallet& wallet, const CKey& key)
 BOOST_FIXTURE_TEST_CASE(scan_for_wallet_transactions, TestChain100Setup)
 {
     // Cap last block file size, and mine new block in a new block file.
-    CBlockIndex* oldTip = ::ChainActive().Tip();
+    CBlockIndex* oldTip = WITH_LOCK(::cs_main, return ::ChainActive().Tip());
     GetBlockFileInfo(oldTip->GetBlockPos().nFile)->nSize = MAX_BLOCKFILE_SIZE;
     CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
-    CBlockIndex* newTip = ::ChainActive().Tip();
+    CBlockIndex* newTip = WITH_LOCK(::cs_main, return ::ChainActive().Tip());
 
     NodeContext node;
     auto chain = interfaces::MakeChain(node);
@@ -133,10 +133,10 @@ BOOST_FIXTURE_TEST_CASE(scan_for_wallet_transactions, TestChain100Setup)
 BOOST_FIXTURE_TEST_CASE(importmulti_rescan, TestChain100Setup)
 {
     // Cap last block file size, and mine new block in a new block file.
-    CBlockIndex* oldTip = ::ChainActive().Tip();
+    CBlockIndex* oldTip = WITH_LOCK(::cs_main, return ::ChainActive().Tip());
     GetBlockFileInfo(oldTip->GetBlockPos().nFile)->nSize = MAX_BLOCKFILE_SIZE;
     CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
-    CBlockIndex* newTip = ::ChainActive().Tip();
+    CBlockIndex* newTip = WITH_LOCK(::cs_main, return ::ChainActive().Tip());
 
     NodeContext node;
     auto chain = interfaces::MakeChain(node);
@@ -195,7 +195,8 @@ BOOST_FIXTURE_TEST_CASE(importwallet_rescan, TestChain100Setup)
 {
     // Create two blocks with same timestamp to verify that importwallet rescan
     // will pick up both blocks, not just the first.
-    const int64_t BLOCK_TIME = ::ChainActive().Tip()->GetBlockTimeMax() + 5;
+    const int64_t BLOCK_TIME =
+        WITH_LOCK(::cs_main, return ::ChainActive().Tip()->GetBlockTimeMax() + 5);
     SetMockTime(BLOCK_TIME);
     m_coinbase_txns.emplace_back(CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey())).vtx[0]);
     m_coinbase_txns.emplace_back(CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey())).vtx[0]);

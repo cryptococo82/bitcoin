@@ -1402,7 +1402,15 @@ void static ProcessGetBlockData(CNode* pfrom, const CChainParams& chainparams, c
     } // release cs_main before calling ActivateBestChain
     if (need_activate_chain) {
         BlockValidationState state;
-        if (!ActivateBestChain(state, Params(), a_recent_block)) {
+
+        // XXX this is kind of a hack here to get around the fact that we can't
+        // hold cs_main going into ActivateBestChain. This is safe because the
+        // only place that we'll potentially deallocate anything pointed to by
+        // ChainstateActive is during shutdown.
+        CChainState* active;
+        WITH_LOCK(::cs_main, active = &::ChainstateActive());
+
+        if (!active->ActivateBestChain(state, Params(), a_recent_block)) {
             LogPrint(BCLog::NET, "failed to activate chain (%s)\n", FormatStateMessage(state));
         }
     }
@@ -2014,8 +2022,10 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
         if (!pfrom->fInbound && pfrom->IsAddrRelayPeer())
         {
-            // Advertise our address
-            if (fListen && !::ChainstateActive().IsInitialBlockDownload())
+            bool is_ibd;
+            WITH_LOCK(::cs_main, is_ibd = ::ChainstateActive().IsInitialBlockDownload());
+
+            if (fListen && !is_ibd)
             {
                 CAddress addr = GetLocalAddress(&pfrom->addr, pfrom->GetLocalServices());
                 FastRandomContext insecure_rand;

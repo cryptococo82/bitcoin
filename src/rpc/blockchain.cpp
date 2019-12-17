@@ -1000,7 +1000,10 @@ static UniValue gettxoutsetinfo(const JSONRPCRequest& request)
     UniValue ret(UniValue::VOBJ);
 
     CCoinsStats stats;
-    ::ChainstateActive().ForceFlushStateToDisk();
+    {
+        LOCK(::cs_main);
+        ::ChainstateActive().ForceFlushStateToDisk();
+    }
 
     CCoinsView* coins_view = WITH_LOCK(cs_main, return &ChainstateActive().CoinsDB());
     if (GetUTXOStats(coins_view, stats)) {
